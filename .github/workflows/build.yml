@@ -1,4 +1,4 @@
-name: Build APK (Stable Full Fix)
+name: Build APK (Data Safe Mode)
 
 on:
   workflow_dispatch:
@@ -11,12 +11,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 🔥 CACHE BUILDOZER (prevents re-downloads)
+      - name: Cache Buildozer
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('**/*.spec') }}
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Install system dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y git zip unzip openjdk-17-jdk \
@@ -28,17 +35,12 @@ jobs:
           pip install --upgrade pip
           pip install cython buildozer
 
-      # IMPORTANT: force full bootstrap install
-      - name: Clean previous builds
-        run: |
-          rm -rf .buildozer
-
       - name: Build APK
         run: |
-          buildozer -v android debug
+          buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: neon-snake-apk
-          path: bin/*.apkk
+          path: bin/*.apk

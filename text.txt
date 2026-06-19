@@ -1,0 +1,148 @@
+from kivy.app import App
+from kivy.uix.widget import Widget
+from kivy.clock import Clock
+from kivy.graphics import Color, Rectangle
+from kivy.core.window import Window
+import random
+import json
+import os
+
+# ---------- SETTINGS ----------
+GRID = 20
+WIDTH, HEIGHT = 900, 600
+
+Window.size = (WIDTH, HEIGHT)
+
+SAVE_FILE = "save.json"
+
+def load_data():
+    if os.path.exists(SAVE_FILE):
+        with open(SAVE_FILE, "r") as f:
+            return json.load(f)
+    return {"coins": 0, "highscore": 0, "skin": "green"}
+
+def save_data(data):
+    with open(SAVE_FILE, "w") as f:
+        json.dump(data, f)
+
+skins = {
+    "green": (0, 1, 0),
+    "fire": (1, 0.4, 0),
+    "ice": (0, 0.9, 1),
+    "purple": (0.7, 0, 1)
+}
+
+class Game(Widget):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.data = load_data()
+
+        self.snake = [(10, 10)]
+        self.direction = (1, 0)
+
+        self.boss = [(15, 10)]
+        self.food = self.spawn_food()
+
+        self.score = 0
+        self.speed = 0.15
+        self.game_over = False
+        self.paused = False
+
+        Clock.schedule_interval(self.update, self.speed)
+
+    def spawn_food(self):
+        return (random.randint(0, WIDTH // GRID - 1),
+                random.randint(0, HEIGHT // GRID - 1))
+
+    def move_boss(self):
+        head = self.boss[0]
+        px, py = self.snake[0]
+
+        dx = 1 if px > head[0] else -1 if px < head[0] else 0
+        dy = 1 if py > head[1] else -1 if py < head[1] else 0
+
+        new = (head[0] + dx, head[1] + dy)
+        self.boss.insert(0, new)
+        self.boss.pop()
+
+    def update(self, dt):
+        if self.game_over or self.paused:
+            return
+
+        hx, hy = self.snake[0]
+        dx, dy = self.direction
+
+        new_head = (hx + dx, hy + dy)
+
+        # walls
+        if (new_head[0] < 0 or new_head[1] < 0 or
+            new_head[0] >= WIDTH // GRID or new_head[1] >= HEIGHT // GRID):
+            self.game_over = True
+
+        # self collision
+        if new_head in self.snake:
+            self.game_over = True
+
+        # boss collision
+        if new_head in self.boss:
+            self.game_over = True
+
+        if not self.game_over:
+            self.snake.insert(0, new_head)
+
+            if new_head == self.food:
+                self.score += 10
+                self.data["coins"] += 1
+                self.food = self.spawn_food()
+                self.speed = max(0.05, self.speed - 0.005)
+            else:
+                self.snake.pop()
+
+            self.move_boss()
+
+        self.draw()
+
+    def draw(self):
+        self.canvas.clear()
+
+        with self.canvas:
+            # snake
+            Color(*skins[self.data["skin"]])
+            for x, y in self.snake:
+                Rectangle(pos=(x * GRID, y * GRID),
+                          size=(GRID-2, GRID-2))
+
+            # food
+            Color(1, 0, 0)
+            fx, fy = self.food
+            Rectangle(pos=(fx * GRID, fy * GRID),
+                      size=(GRID-2, GRID-2))
+
+            # boss
+            Color(1, 0, 1)
+            for x, y in self.boss:
+                Rectangle(pos=(x * GRID, y * GRID),
+                          size=(GRID-2, GRID-2))
+
+    def on_touch_down(self, touch):
+        x, y = touch.pos
+
+        if x > WIDTH * 0.7:
+            self.direction = (1, 0)
+        elif x < WIDTH * 0.3:
+            self.direction = (-1, 0)
+        elif y > HEIGHT * 0.5:
+            self.direction = (0, 1)
+        else:
+            self.direction = (0, -1)
+
+class SnakeApp(App):
+    def build(self):
+        return Game()
+
+    def on_stop(self):
+        save_data(self.root.data)
+
+if __name__ == "__main__":
+    SnakeApp().run()

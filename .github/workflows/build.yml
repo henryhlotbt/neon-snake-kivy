@@ -1,4 +1,4 @@
-name: Build APK (Clean Buildozer Fix)
+name: Build APK (Stable Full Fix)
 
 on:
   workflow_dispatch:
@@ -28,13 +28,17 @@ jobs:
           pip install --upgrade pip
           pip install cython buildozer
 
+      # IMPORTANT: force full bootstrap install
+      - name: Clean previous builds
+        run: |
+          rm -rf .buildozer
+
       - name: Build APK
         run: |
-          buildozer android clean
           buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: apk
-          path: bin/*.apk
+          name: neon-snake-apk
+          path: bin/*.apkk

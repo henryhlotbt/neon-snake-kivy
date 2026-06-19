@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK (Kivy)
 
 on:
   workflow_dispatch:
@@ -17,22 +17,54 @@ jobs:
         with:
           python-version: "3.10"
 
+      # ---------------- SYSTEM DEPENDENCIES ----------------
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk \
-          python3-pip build-essential autoconf libtool pkg-config \
-          zlib1g-dev libncurses5-dev cmake libffi-dev libssl-dev
+          sudo apt-get install -y \
+            git zip unzip openjdk-17-jdk \
+            python3-pip build-essential \
+            autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev cmake \
+            libffi-dev libssl-dev wget curl
 
-      - name: Install Buildozer
+      # ---------------- ANDROID SDK (FIX AIDL) ----------------
+      - name: Install Android SDK + Build Tools
         run: |
-          pip install --upgrade pip
+          mkdir -p $HOME/android-sdk
+          cd $HOME/android-sdk
+
+          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip commandlinetools-linux-11076708_latest.zip
+
+          mkdir -p cmdline-tools
+          mv cmdline-tools latest || true
+          mv latest cmdline-tools/ || true
+
+          yes | $HOME/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/android-sdk \
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.2"
+
+      # ---------------- ENVIRONMENT ----------------
+      - name: Set Android environment
+        run: |
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
+
+      # ---------------- PYTHON DEPENDENCIES ----------------
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
           pip install cython buildozer
 
+      # ---------------- BUILD APK ----------------
       - name: Build APK
         run: |
           buildozer -v android debug
 
+      # ---------------- UPLOAD APK ----------------
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
